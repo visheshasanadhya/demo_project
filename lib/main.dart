@@ -1,12 +1,8 @@
 import 'dart:typed_data';
-import 'dart:io' as io;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:screenshot/screenshot.dart';
-import 'package:universal_html/html.dart' as html;
+import 'utils/image_picker_util.dart';
+import 'utils/download_util.dart';
 
 void main() {
   runApp(const MaterialApp(home: ShivPoster()));
@@ -26,44 +22,21 @@ class _ShivPosterState extends State<ShivPoster> {
 
   final ScreenshotController screenshotController = ScreenshotController();
 
-  Future<void> pickImage(bool isProfile) async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? file = await picker.pickImage(source: ImageSource.gallery);
-    if (file != null) {
-      final bytes = await file.readAsBytes();
+  void handlePickImage(bool isProfile) async {
+    final image = await ImagePickerUtil.pickImage();
+    if (image != null) {
       setState(() {
         if (isProfile) {
-          userImage = bytes;
+          userImage = image;
         } else {
-          bgImage = bytes;
+          bgImage = image;
         }
       });
     }
   }
 
-  Future<void> downloadPoster() async {
-    final image = await screenshotController.capture();
-    if (image == null) return;
-
-    if (kIsWeb) {
-      final blob = html.Blob([image]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', 'poster.png')
-        ..click();
-      html.Url.revokeObjectUrl(url);
-    } else {
-      if (await Permission.storage.request().isGranted) {
-        final directory = await getApplicationDocumentsDirectory();
-        final path =
-            '${directory.path}/poster_${DateTime.now().millisecondsSinceEpoch}.png';
-        final file = io.File(path);
-        await file.writeAsBytes(image);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Poster saved at $path')));
-      }
-    }
+  void handleDownload() async {
+    await DownloadUtil.downloadPoster(context, screenshotController);
   }
 
   @override
@@ -138,11 +111,11 @@ class _ShivPosterState extends State<ShivPoster> {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () => pickImage(true),
+              onPressed: () => handlePickImage(true),
               child: const Text("Upload Profile Image"),
             ),
             ElevatedButton(
-              onPressed: () => pickImage(false),
+              onPressed: () => handlePickImage(false),
               child: const Text("Upload Background Image"),
             ),
             TextField(
@@ -156,7 +129,7 @@ class _ShivPosterState extends State<ShivPoster> {
             ),
             if (showDownload)
               ElevatedButton(
-                onPressed: downloadPoster,
+                onPressed: handleDownload,
                 child: const Text("Download Poster"),
               ),
           ],
